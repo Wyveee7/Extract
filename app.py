@@ -1,58 +1,39 @@
 import streamlit as st
-import pytesseract
-from pdf2image import convert_from_bytes
-from io import BytesIO
 import openai
 import os
 
-# Configurar página
-st.set_page_config(page_title="Extrator Inteligente de Tabelas de Aço", layout="wide")
-st.title("📐 Extrator de Tabelas de Aço com OpenAI + OCR")
+st.set_page_config("Bot de Tabela de Aço", layout="wide")
+st.title("📐 GPT Extrator de Tabelas de Aço")
 
-# API Key da OpenAI (escondida)
 openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
 
-uploaded_file = st.file_uploader("📄 Envie o PDF exportado do AutoCAD", type=["pdf"])
+texto_bruto = st.text_area("📋 Cole aqui o texto extraído do PDF ou OCR:", height=300)
 
-# Função para aplicar OCR na primeira página do PDF
-def extrair_texto_ocr(pdf_bytes):
-    images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
-    texto_ocr = pytesseract.image_to_string(images[0], lang="por")
-    return texto_ocr
+if st.button("🔍 Gerar tabela"):
+    if texto_bruto.strip():
+        with st.spinner("Enviando para GPT..."):
+            prompt = f"""
+O texto a seguir foi extraído de um PDF técnico de engenharia. Ele contém informações sobre barras de aço, incluindo posição, bitola, quantidade, comprimento e peso.
 
-# Função para enviar texto ao GPT e pedir tabela formatada
-def formatar_com_gpt(texto):
-    prompt = f"""
-O texto a seguir foi extraído de um PDF de engenharia com um resumo de aço. Reestruture isso em uma tabela CSV com colunas:
-POS, BIT, QUANT, COMPR, TOTAL, PESO, UNIT. 
-Apenas retorne a tabela formatada, sem explicações.
+Sua tarefa é:
+1. Identificar e organizar os dados em formato de tabela CSV.
+2. Utilizar colunas: POS, BIT, QUANT, COMPR, TOTAL, PESO, UNIT
+3. Corrigir espaçamentos ou quebras se necessário.
 
 Texto:
-""" + texto.strip()
+{texto_bruto}
+"""
 
-    resposta = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "Você formata dados técnicos em tabelas CSV."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.0
-    )
-
-    return resposta.choices[0].message.content
-
-if uploaded_file:
-    st.info("🔍 Processando arquivo...")
-
-    # Tentar OCR na primeira página
-    ocr_text = extrair_texto_ocr(uploaded_file.read())
-    st.text_area("🧾 Texto extraído via OCR:", ocr_text[:2000], height=200)
-
-    if st.button("🔁 Enviar para GPT e gerar tabela"):
-        with st.spinner("Aguarde, formatando com GPT-4..."):
-            resposta_gpt = formatar_com_gpt(ocr_text)
-            st.success("✅ Tabela formatada com sucesso!")
-            st.code(resposta_gpt, language="csv")
-
-            # Opção de download
-            st.download_button("📥 Baixar CSV", data=resposta_gpt, file_name="tabela_aco.csv")
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Você organiza textos técnicos em tabelas estruturadas."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1
+            )
+            tabela_csv = response.choices[0].message.content
+            st.success("✅ Tabela gerada com sucesso!")
+            st.code(tabela_csv, language="csv")
+    else:
+        st.warning("Cole algum texto primeiro.")
