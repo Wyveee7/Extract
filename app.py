@@ -1,5 +1,4 @@
 import streamlit as st
-import pdfplumber
 import pytesseract
 from pdf2image import convert_from_bytes
 from io import BytesIO
